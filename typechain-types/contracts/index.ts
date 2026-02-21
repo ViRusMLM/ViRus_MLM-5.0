@@ -3,3 +3,5 @@
 /* eslint-disable */
 import type * as virusMlmV5Sol from "./VirusMLM_V5.sol";
 export type { virusMlmV5Sol };
+import type * as mocks from "./mocks";
+export type { mocks };
