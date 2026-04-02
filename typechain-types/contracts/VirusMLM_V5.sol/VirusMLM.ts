@@ -27,6 +27,7 @@ export interface VirusMLMInterface extends Interface {
   getFunction(
     nameOrSignature:
       | "MAX_REFERRAL_DEPTH"
+      | "MAX_VIP_CLEANUP"
       | "MIN_WITHDRAW"
       | "PACKETS"
       | "POOL_DISTRIBUTION_INTERVAL"
@@ -44,6 +45,7 @@ export interface VirusMLMInterface extends Interface {
       | "developmentFundWallet"
       | "distributePool"
       | "donateToPool"
+      | "emergencyClaimExpiredPool"
       | "emergencyWithdraw"
       | "gamePoolWallet"
       | "getGovernanceInfo"
@@ -53,6 +55,8 @@ export interface VirusMLMInterface extends Interface {
       | "getUserInfo"
       | "getVipInfo"
       | "getVipList"
+      | "inMatrixQueue"
+      | "inPoolQueue"
       | "initiateMultisigTransition"
       | "isRegistered"
       | "lastPoolDistribution"
@@ -106,6 +110,10 @@ export interface VirusMLMInterface extends Interface {
 
   encodeFunctionData(
     functionFragment: "MAX_REFERRAL_DEPTH",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "MAX_VIP_CLEANUP",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -174,6 +182,10 @@ export interface VirusMLMInterface extends Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "emergencyClaimExpiredPool",
+    values: [AddressLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "emergencyWithdraw",
     values: [AddressLike, BigNumberish]
   ): string;
@@ -208,6 +220,14 @@ export interface VirusMLMInterface extends Interface {
   encodeFunctionData(
     functionFragment: "getVipList",
     values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "inMatrixQueue",
+    values: [AddressLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "inPoolQueue",
+    values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "initiateMultisigTransition",
@@ -315,6 +335,10 @@ export interface VirusMLMInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "MAX_VIP_CLEANUP",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "MIN_WITHDRAW",
     data: BytesLike
   ): Result;
@@ -374,6 +398,10 @@ export interface VirusMLMInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "emergencyClaimExpiredPool",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "emergencyWithdraw",
     data: BytesLike
   ): Result;
@@ -403,6 +431,14 @@ export interface VirusMLMInterface extends Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "getVipInfo", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "getVipList", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "inMatrixQueue",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "inPoolQueue",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "initiateMultisigTransition",
     data: BytesLike
@@ -828,6 +864,8 @@ export interface VirusMLM extends BaseContract {
 
   MAX_REFERRAL_DEPTH: TypedContractMethod<[], [bigint], "view">;
 
+  MAX_VIP_CLEANUP: TypedContractMethod<[], [bigint], "view">;
+
   MIN_WITHDRAW: TypedContractMethod<[], [bigint], "view">;
 
   PACKETS: TypedContractMethod<[arg0: BigNumberish], [bigint], "view">;
@@ -878,6 +916,12 @@ export interface VirusMLM extends BaseContract {
 
   donateToPool: TypedContractMethod<
     [_amount: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+
+  emergencyClaimExpiredPool: TypedContractMethod<
+    [_user: AddressLike],
     [void],
     "nonpayable"
   >;
@@ -981,6 +1025,10 @@ export interface VirusMLM extends BaseContract {
     [string[]],
     "view"
   >;
+
+  inMatrixQueue: TypedContractMethod<[arg0: AddressLike], [boolean], "view">;
+
+  inPoolQueue: TypedContractMethod<[arg0: AddressLike], [boolean], "view">;
 
   initiateMultisigTransition: TypedContractMethod<
     [_multisigAddress: AddressLike],
@@ -1129,6 +1177,9 @@ export interface VirusMLM extends BaseContract {
     nameOrSignature: "MAX_REFERRAL_DEPTH"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
+    nameOrSignature: "MAX_VIP_CLEANUP"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
     nameOrSignature: "MIN_WITHDRAW"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
@@ -1187,6 +1238,9 @@ export interface VirusMLM extends BaseContract {
   getFunction(
     nameOrSignature: "donateToPool"
   ): TypedContractMethod<[_amount: BigNumberish], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "emergencyClaimExpiredPool"
+  ): TypedContractMethod<[_user: AddressLike], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "emergencyWithdraw"
   ): TypedContractMethod<
@@ -1292,6 +1346,12 @@ export interface VirusMLM extends BaseContract {
   getFunction(
     nameOrSignature: "getVipList"
   ): TypedContractMethod<[_starLevel: BigNumberish], [string[]], "view">;
+  getFunction(
+    nameOrSignature: "inMatrixQueue"
+  ): TypedContractMethod<[arg0: AddressLike], [boolean], "view">;
+  getFunction(
+    nameOrSignature: "inPoolQueue"
+  ): TypedContractMethod<[arg0: AddressLike], [boolean], "view">;
   getFunction(
     nameOrSignature: "initiateMultisigTransition"
   ): TypedContractMethod<[_multisigAddress: AddressLike], [void], "nonpayable">;

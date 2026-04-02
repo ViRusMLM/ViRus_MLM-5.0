@@ -4,6 +4,8 @@ pragma solidity ^0.8.19;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /**
  * @title VirusMLM V5.0
@@ -12,11 +14,13 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * @dev Полное соответствие ТЗ версии 5.1
  */
 contract VirusMLM is ReentrancyGuard, Ownable {
+    using SafeERC20 for IERC20;
     // ========== КОНСТАНТЫ ==========
     uint256 public constant MIN_WITHDRAW = 2 ether; // 2 USDT
     uint256 public constant POOL_DISTRIBUTION_INTERVAL = 1 days;
     uint256 public constant VIP_DURATION = 30 days;
     uint256 public constant MAX_REFERRAL_DEPTH = 12;
+    uint256 public constant MAX_VIP_CLEANUP = 200;
     
     // Пакеты в USDT (1 ether = 1 USDT)
     uint256[] public PACKETS = [0, 50 ether, 100 ether, 150 ether, 200 ether, 250 ether];
@@ -72,14 +76,17 @@ contract VirusMLM is ReentrancyGuard, Ownable {
     mapping(uint256 => MatrixNode) public matrixNodes;
     mapping(address => bool) public isRegistered;
     mapping(address => VipInfo) public vipInfo;
+    mapping(address => bool) public inMatrixQueue;
+    mapping(address => bool) public inPoolQueue;
     
     // Списки VIP по уровням (для быстрого распределения)
     mapping(uint256 => address[]) private vipByLevel;
     mapping(address => uint256) private vipIndexInLevel; // для удаления
     
     // Очереди для Keeper
-    address[] private matrixClaimQueue;
-    address[] private poolClaimQueue;
+    using EnumerableSet for EnumerableSet.AddressSet;
+    EnumerableSet.AddressSet private matrixClaimQueue;
+    EnumerableSet.AddressSet private poolClaimQueue;
     
     // Статистика
     uint256 public totalUsers;
@@ -116,17 +123,6 @@ contract VirusMLM is ReentrancyGuard, Ownable {
     event MultisigTransitionCompleted(address multisigAddress, uint256 time);
     
     // ========== МОДИФИКАТОРЫ ==========
-    modifier onlyOwnerOrMultisig() {
-        if (currentPhase == GovernancePhase.SINGLE_OWNER) {
-            require(msg.sender == owner(), "Not owner");
-        } else if (currentPhase == GovernancePhase.MULTISIG) {
-            require(msg.sender == owner(), "Not multisig");
-        } else {
-            require(msg.sender == owner() || msg.sender == pendingMultisig, "Not authorized");
-        }
-        _;
-    }
-    
     modifier onlyRegistered() {
         require(isRegistered[msg.sender], "Not registered");
         _;
@@ -136,6 +132,17 @@ contract VirusMLM is ReentrancyGuard, Ownable {
         require(users[msg.sender].currentPacket > 0, "Not active");
         _;
     }
+
+    modifier onlyOwnerOrMultisig() {
+    if (currentPhase == GovernancePhase.SINGLE_OWNER) {
+        require(msg.sender == owner(), "Not owner");
+    } else if (currentPhase == GovernancePhase.TRANSITION) {
+        require(msg.sender == owner() || msg.sender == pendingMultisig, "Not authorized");
+    } else if (currentPhase == GovernancePhase.MULTISIG) {
+        require(msg.sender == owner(), "Not multisig");
+    }
+    _;
+}
     
     // ========== КОНСТРУКТОР ==========
     constructor(
@@ -206,34 +213,27 @@ contract VirusMLM is ReentrancyGuard, Ownable {
      * @param _referrer Адрес спонсора
      */
     function register(address _referrer) external {
-        require(!isRegistered[msg.sender], "Already registered");
-        require(_referrer == address(0) || isRegistered[_referrer], "Invalid referrer");
-        
-        uint256 placementId = 0;
-        
-        // Если спонсор указан и имеет пакет >0, ищем место в матрице
-        if (_referrer != address(0) && users[_referrer].currentPacket > 0) {
-            placementId = _findPlacementInMatrix(_referrer);
-            if (placementId > 0) {
-                _placeUserInMatrix(msg.sender, placementId);
-            }
-        }
-        
-        users[msg.sender] = User({
-            currentPacket: 0,
-            referrer: _referrer,
-            placementId: placementId,
-            matrixBalance: 0,
-            poolBalance: 0,
-            totalEarned: 0,
-            registrationTime: block.timestamp
-        });
-        
-        isRegistered[msg.sender] = true;
-        totalUsers++;
-        
-        emit UserRegistered(msg.sender, _referrer, placementId);
-    }
+    require(!isRegistered[msg.sender], "Already registered");
+    require(_referrer == address(0) || isRegistered[_referrer], "Invalid referrer");
+    
+    // Пользователи с пакетом 0 не получают место в матрице
+    // Место будет присвоено только при активации первого платного пакета
+    
+    users[msg.sender] = User({
+        currentPacket: 0,
+        referrer: _referrer,
+        placementId: 0,
+        matrixBalance: 0,
+        poolBalance: 0,
+        totalEarned: 0,
+        registrationTime: block.timestamp
+    });
+    
+    isRegistered[msg.sender] = true;
+    totalUsers++;
+    
+    emit UserRegistered(msg.sender, _referrer, 0);
+}
     
     // ========== АКТИВАЦИЯ ПАКЕТОВ ==========
     
@@ -255,11 +255,8 @@ contract VirusMLM is ReentrancyGuard, Ownable {
             require(oldPacket == 0, "Already have packet");
         }
         
-        // Полная оплата пакета
-        require(
-            usdtToken.transferFrom(msg.sender, address(this), newPacket),
-            "USDT transfer failed"
-        );
+       // Полная оплата пакета
+       usdtToken.safeTransferFrom(msg.sender, address(this), newPacket);
         
         // Обновление пакета пользователя
         user.currentPacket = newPacket;
@@ -295,91 +292,81 @@ contract VirusMLM is ReentrancyGuard, Ownable {
      * @notice Распределение средств при активации пакета
      */
     function _distributeActivation(address _user, uint256 _amount, address _sponsor) internal {
-        // 1. Реферальная выплата (50%)
-        uint256 referralAmount = _amount * 50 / 100;
+    // 1. Реферальная выплата (50%)
+    uint256 referralAmount = _amount * 50 / 100;
+    
+    if (_sponsor != address(0)) {
+        User storage sponsorData = users[_sponsor];
         
-        if (_sponsor != address(0)) {
-            User storage sponsorData = users[_sponsor];
-            
-            if (sponsorData.currentPacket == 0) {
-                // Спонсор с пакетом 0
-                if (_amount == 50 ether) {
-                    // Только с активации пакета 50
-                    _safeTransfer(_sponsor, referralAmount);
-                    sponsorData.totalEarned += referralAmount;
-                    totalReferralPayouts += referralAmount;
-                    emit ReferralPayout(_sponsor, _user, referralAmount, false);
-                } else {
-                    // С апгрейдов (пакеты 100-250) → в пул
-                    liquidityPool += referralAmount;
-                    emit ReferralPayout(_sponsor, _user, referralAmount, true);
-                }
+        if (sponsorData.currentPacket == 0) {
+            // Спонсор с пакетом 0
+            if (_amount == 50 ether) {
+                usdtToken.safeTransfer(_sponsor, referralAmount);
+                sponsorData.totalEarned += referralAmount;
+                totalReferralPayouts += referralAmount;
+                emit ReferralPayout(_sponsor, _user, referralAmount, false);
             } else {
-                // Обычный спонсор
-                _safeTransfer(_sponsor, referralAmount);
+                liquidityPool += referralAmount;
+                emit ReferralPayout(_sponsor, _user, referralAmount, true);
+            }
+        } else {
+            // Обычный спонсор
+            if (_sponsor == rootId) {
+                liquidityPool += referralAmount;
+                emit ReferralPayout(_sponsor, _user, referralAmount, true);
+            } else {
+                usdtToken.safeTransfer(_sponsor, referralAmount);
                 sponsorData.totalEarned += referralAmount;
                 totalReferralPayouts += referralAmount;
                 emit ReferralPayout(_sponsor, _user, referralAmount, false);
             }
-        } else {
-            // Нет спонсора (только для root, но root не активирует пакеты)
-            liquidityPool += referralAmount;
         }
-        
-        // 2. Комиссия активации (2%)
-        uint256 activationFee = _amount * 2 / 100;
-        usdtToken.transfer(developmentFundWallet, activationFee);
-        
-        // 3. Матричное распределение (48%)
-        uint256 matrixAmount = _amount * 48 / 100;
-        _distributeUpline(_user, matrixAmount, 4);
+    } else {
+        liquidityPool += referralAmount;
     }
+    
+    // 2. Комиссия активации (2%)
+    uint256 activationFee = _amount * 2 / 100;
+    usdtToken.safeTransfer(developmentFundWallet, activationFee);
+    
+    // 3. Матричное распределение (48%) — передаём полную сумму пакета
+    _distributeUpline(_user, _amount, 4);
+}
     
     /**
      * @notice Распределение вверх по реферальной цепочке
      * @param _percentPerLevel Процент на уровень (4% для активации, 8% для реинвеста)
      */
     function _distributeUpline(address _startUser, uint256 _totalAmount, uint256 _percentPerLevel) internal {
-        address currentUser = _startUser;
-        uint256 amountPerLevel = _totalAmount * _percentPerLevel / 100;
-        uint256 distributed = 0;
-        
-        for (uint256 i = 0; i < MAX_REFERRAL_DEPTH; i++) {
-            User storage upline = users[currentUser];
-            
-            // Достигли верха цепочки
-            if (upline.referrer == address(0)) break;
-            
-            currentUser = upline.referrer;
-            User storage rewardUser = users[currentUser];
-            
-            // Пропускаем пользователей с пакетом 0
-            if (rewardUser.currentPacket == 0) continue;
-            
-            // Корневой ID → всё в пул
-            if (currentUser == rootId) {
-                liquidityPool += amountPerLevel;
-            } else {
-                rewardUser.matrixBalance += amountPerLevel;
-                rewardUser.totalEarned += amountPerLevel;
-                totalMatrixPayouts += amountPerLevel;
-                
-                // Добавляем в очередь на вывод
-                if (rewardUser.matrixBalance >= MIN_WITHDRAW) {
-                    _addToMatrixClaimQueue(currentUser);
-                }
-                
-                emit MatrixPayout(currentUser, amountPerLevel);
+    uint256 amountPerLevel = _totalAmount * _percentPerLevel / 100;
+    address current = users[_startUser].referrer; // сразу первый реферер
+
+    for (uint256 level = 1; level <= MAX_REFERRAL_DEPTH; level++) {
+        if (current == address(0)) {
+            // Нет больше уровней → остаток в пул
+            liquidityPool += amountPerLevel * (MAX_REFERRAL_DEPTH - level + 1);
+            break;
+        }
+
+        User storage upline = users[current];
+
+        if (upline.currentPacket == 0 || current == rootId) {
+            liquidityPool += amountPerLevel;
+        } else {
+            upline.matrixBalance += amountPerLevel;
+            upline.totalEarned += amountPerLevel;
+            totalMatrixPayouts += amountPerLevel;
+
+            if (upline.matrixBalance >= MIN_WITHDRAW) {
+                _addToMatrixClaimQueue(current);
             }
-            
-            distributed += amountPerLevel;
+
+            emit MatrixPayout(current, amountPerLevel);
         }
-        
-        // Остаток в пул ликвидности
-        if (_totalAmount > distributed) {
-            liquidityPool += (_totalAmount - distributed);
-        }
+
+        current = upline.referrer;
     }
+}
     
     // ========== ВЫВОД СРЕДСТВ ==========
     
@@ -401,7 +388,7 @@ contract VirusMLM is ReentrancyGuard, Ownable {
         user.totalEarned += toWallet;
         
         // Вывод на кошелек
-        usdtToken.transfer(msg.sender, toWallet);
+        usdtToken.safeTransfer(msg.sender, toWallet);
         
         // Реинвест
         _processReinvest(msg.sender, toReinvest);
@@ -432,7 +419,7 @@ contract VirusMLM is ReentrancyGuard, Ownable {
         totalPoolPayouts += toWallet;
         
         // Вывод на кошелек
-        usdtToken.transfer(msg.sender, toWallet);
+        usdtToken.safeTransfer(msg.sender, toWallet);
         
         // Реинвест
         _processReinvest(msg.sender, toReinvest);
@@ -442,25 +429,49 @@ contract VirusMLM is ReentrancyGuard, Ownable {
         
         emit PoolClaimed(msg.sender, toWallet, toReinvest);
     }
+
+    /**
+ * @notice Вывод истекшего баланса пула (только для админа)
+ * @param _user Адрес пользователя с истекшим VIP
+ */
+function emergencyClaimExpiredPool(address _user) external onlyOwnerOrMultisig {
+    User storage user = users[_user];
+    VipInfo memory vip = vipInfo[_user];
+    
+    require(user.poolBalance >= MIN_WITHDRAW, "Min 2 USDT required");
+    require(!vip.isActive || block.timestamp >= vip.expiresAt, "VIP is still active");
+    
+    uint256 balance = user.poolBalance;
+    uint256 toWallet = balance * 90 / 100;
+    uint256 toReinvest = balance - toWallet;
+    
+    user.poolBalance = 0;
+    user.totalEarned += toWallet;
+    totalPoolPayouts += toWallet;
+    
+    usdtToken.safeTransfer(_user, toWallet);
+    _processReinvest(_user, toReinvest);
+    
+    emit PoolClaimed(_user, toWallet, toReinvest);
+}
     
     /**
      * @notice Обработка реинвеста
      */
     function _processReinvest(address _user, uint256 _amount) internal {
-        if (_amount == 0) return;
-        
-        // Комиссия реинвеста (2%)
-        uint256 reinvestFee = _amount * 2 / 100;
-        usdtToken.transfer(reinvestFeeWallet, reinvestFee);
-        
-        // Игровой пул (2%)
-        uint256 gamePool = _amount * 2 / 100;
-        usdtToken.transfer(gamePoolWallet, gamePool);
-        
-        // Матричное распределение (96%)
-        uint256 matrixAmount = _amount * 96 / 100;
-        _distributeUpline(_user, matrixAmount, 8);
-    }
+    if (_amount == 0) return;
+    
+    // Комиссия реинвеста (2%)
+    uint256 reinvestFee = _amount * 2 / 100;
+    usdtToken.safeTransfer(reinvestFeeWallet, reinvestFee);
+    
+    // Игровой пул (2%)
+    uint256 gamePool = _amount * 2 / 100;
+    usdtToken.safeTransfer(gamePoolWallet, gamePool);
+    
+    // Матричное распределение (96%) — передаём полную сумму реинвеста
+    _distributeUpline(_user, _amount, 8);
+}
     
     // ========== VIP-СИСТЕМА ==========
     
@@ -492,33 +503,29 @@ contract VirusMLM is ReentrancyGuard, Ownable {
      * @param _starLevel Уровень VIP
      */
     function confirmVip(address _user, uint256 _starLevel) external onlyOwnerOrMultisig {
-        require(isRegistered[_user], "User not registered");
-        require(_starLevel >= 1 && _starLevel <= 5, "Invalid star level");
-        
-        User storage user = users[_user];
-        uint256 requiredPacket = PACKETS[_starLevel];
-        require(user.currentPacket >= requiredPacket, "Packet too low");
-        
-        VipInfo storage vip = vipInfo[_user];
-        
-        // Если был активный VIP, удаляем из старого списка
-        if (vip.isActive && vip.starLevel > 0) {
-            _removeFromVipList(_user, vip.starLevel);
-        }
-        
-        // Устанавливаем новый VIP
-        vip.starLevel = _starLevel;
-        vip.verifiedAt = block.timestamp;
-        vip.expiresAt = block.timestamp + VIP_DURATION;
-        vip.isActive = true;
-        // antiSybilVerified сохраняется
-        
-        // Добавляем в список по уровню
-        _addToVipList(_user, _starLevel);
-        
-        emit VipConfirmed(_user, _starLevel, vip.expiresAt);
+    require(isRegistered[_user], "User not registered");
+    require(_starLevel >= 1 && _starLevel <= 5, "Invalid star level");
+    
+    User storage user = users[_user];
+    uint256 requiredPacket = PACKETS[_starLevel];
+    require(user.currentPacket >= requiredPacket, "Packet too low");
+    
+    VipInfo storage vip = vipInfo[_user];
+    
+    if (vip.isActive && vip.starLevel > 0) {
+        _removeFromVipList(_user, vip.starLevel);
     }
     
+    vip.starLevel = _starLevel;
+    vip.verifiedAt = block.timestamp;
+    vip.expiresAt = block.timestamp + VIP_DURATION;
+    vip.isActive = true;
+    
+    _addToVipList(_user, _starLevel);
+    
+    emit VipConfirmed(_user, _starLevel, vip.expiresAt);
+}
+
     /**
      * @notice Продление VIP-статуса (без изменения уровня)
      */
@@ -561,17 +568,19 @@ contract VirusMLM is ReentrancyGuard, Ownable {
      * @notice Очистка истёкших VIP из списка
      */
     function _cleanExpiredVips(uint256 _starLevel) internal {
-        address[] storage list = vipByLevel[_starLevel];
+    address[] storage list = vipByLevel[_starLevel];
+    uint256 cleaned = 0;
+    
+    for (int256 i = int256(list.length) - 1; i >= 0 && cleaned < MAX_VIP_CLEANUP; i--) {
+        address userAddr = list[uint256(i)];
+        VipInfo storage vip = vipInfo[userAddr];
         
-        for (int256 i = int256(list.length) - 1; i >= 0; i--) {
-            address userAddr = list[uint256(i)];
-            VipInfo storage vip = vipInfo[userAddr];
-            
-            if (block.timestamp >= vip.expiresAt || !vip.isActive) {
-                _removeFromVipList(userAddr, _starLevel);
-            }
+        if (block.timestamp >= vip.expiresAt || !vip.isActive) {
+            _removeFromVipList(userAddr, _starLevel);
+            cleaned++;
         }
     }
+}
     
     /**
      * @notice Добавление в список VIP
@@ -608,10 +617,10 @@ contract VirusMLM is ReentrancyGuard, Ownable {
      * @notice Пожертвование в пул ликвидности
      */
     function donateToPool(uint256 _amount) external {
-        require(usdtToken.transferFrom(msg.sender, address(this), _amount), "Transfer failed");
-        liquidityPool += _amount;
-        emit PoolDonated(msg.sender, _amount);
-    }
+    usdtToken.safeTransferFrom(msg.sender, address(this), _amount);
+    liquidityPool += _amount;
+    emit PoolDonated(msg.sender, _amount);
+}
     
     // ========== МАТРИЦА ==========
     
@@ -642,28 +651,28 @@ contract VirusMLM is ReentrancyGuard, Ownable {
      * @notice Поиск свободного места BFS
      */
     function _findFreePlace(uint256 _startNodeId) internal view returns (uint256) {
-        uint256[] memory queue = new uint256[](256);
-        uint256 front = 0;
-        uint256 back = 0;
+    uint256[] memory queue = new uint256[](1024);
+    uint256 front = 0;
+    uint256 back = 0;
+    
+    queue[back++] = _startNodeId;
+    
+    while (front < back && front < 1024) {
+        uint256 currentNodeId = queue[front++];
+        MatrixNode storage node = matrixNodes[currentNodeId];
         
-        queue[back++] = _startNodeId;
-        
-        while (front < back && front < 256) {
-            uint256 currentNodeId = queue[front++];
-            MatrixNode storage node = matrixNodes[currentNodeId];
-            
-            if (!node.exists || node.user == address(0)) {
-                return currentNodeId;
-            }
-            
-            if (node.leftChild != 0) queue[back++] = node.leftChild;
-            if (node.rightChild != 0) queue[back++] = node.rightChild;
+        if (!node.exists || node.user == address(0)) {
+            return currentNodeId;
         }
         
-        // Если не нашли, создаём на глубине
-        MatrixNode storage startNode = matrixNodes[_startNodeId];
-        return (1 << (startNode.depth)) + (startNode.position * 2);
+        if (node.leftChild != 0) queue[back++] = node.leftChild;
+        if (node.rightChild != 0) queue[back++] = node.rightChild;
     }
+    
+    // Если не нашли, создаём на глубине
+    MatrixNode storage startNode = matrixNodes[_startNodeId];
+    return (1 << (startNode.depth)) + (startNode.position * 2);
+}
     
     /**
      * @notice Размещение пользователя в матрице
@@ -741,80 +750,79 @@ contract VirusMLM is ReentrancyGuard, Ownable {
 
     // ========== ПУЛ ЛИКВИДНОСТИ ==========
     
-    /**
-     * @notice Распределение пула ликвидности (ежедневно)
-     */
-    function distributePool() public {
-        require(block.timestamp >= lastPoolDistribution + POOL_DISTRIBUTION_INTERVAL, "Too early");
-        require(liquidityPool > 0, "Pool is empty");
-        
-        uint256 totalPool = liquidityPool;
-        liquidityPool = 0;
-        
-        uint256[5] memory distributedPerLevel;
-        uint256 totalDistributed = 0;
-        
-        // Распределение по VIP-уровням
-        for (uint256 level = 0; level < 5; level++) {
-            uint256 starLevel = level + 1;
-            uint256 levelShare = totalPool * POOL_SHARES[level] / 100;
-            
-            if (levelShare == 0) continue;
-            
-            // Очищаем истёкшие VIP
-            _cleanExpiredVips(starLevel);
-            
-            address[] storage vipList = vipByLevel[starLevel];
-            uint256 count = vipList.length;
-            
-            if (count == 0) {
-                // Нет получателей → возврат в пул
-                liquidityPool += levelShare;
-                distributedPerLevel[level] = 0;
-                continue;
-            }
-            
-            uint256 amountPerUser = levelShare / count;
-            uint256 levelDistributed = 0;
-            
-            for (uint256 i = 0; i < count; i++) {
-                address userAddr = vipList[i];
-                User storage user = users[userAddr];
-                
-                // Проверка, что пользователь всё ещё имеет нужный пакет
-                if (user.currentPacket >= PACKETS[starLevel]) {
-                    user.poolBalance += amountPerUser;
-                    levelDistributed += amountPerUser;
-                    
-                    // Добавляем в очередь на вывод
-                    if (user.poolBalance >= MIN_WITHDRAW) {
-                        _addToPoolClaimQueue(userAddr);
-                    }
+    function distributePool() public nonReentrant {
+    require(block.timestamp >= lastPoolDistribution + POOL_DISTRIBUTION_INTERVAL, "Too early");
+    require(liquidityPool > 0, "Pool is empty");
+
+    uint256 totalPool = liquidityPool;
+    liquidityPool = 0;
+
+    uint256[5] memory distributedPerLevel;
+    uint256 totalDistributed = 0;
+    uint256 returnedToPool = 0;   // ← НОВОЕ: отдельный аккумулятор возвратов
+
+    // Распределение по VIP-уровням
+    for (uint256 level = 0; level < 5; level++) {
+        uint256 starLevel = level + 1;
+        uint256 levelShare = totalPool * POOL_SHARES[level] / 100;
+
+        if (levelShare == 0) continue;
+
+        _cleanExpiredVips(starLevel);
+
+        address[] storage vipList = vipByLevel[starLevel];
+        uint256 count = vipList.length;
+
+        if (count == 0) {
+            returnedToPool += levelShare;          // ← только аккумулируем
+            distributedPerLevel[level] = 0;
+            continue;
+        }
+
+        uint256 processedCount = count > 200 ? 200 : count;
+        uint256 amountPerUser = levelShare / count;
+        uint256 levelDistributed = 0;
+
+        for (uint256 i = 0; i < processedCount; i++) {
+            address userAddr = vipList[i];
+            User storage user = users[userAddr];
+
+            if (user.currentPacket >= PACKETS[starLevel]) {
+                user.poolBalance += amountPerUser;
+                levelDistributed += amountPerUser;
+
+                if (user.poolBalance >= MIN_WITHDRAW) {
+                    _addToPoolClaimQueue(userAddr);
                 }
             }
-            
-            distributedPerLevel[level] = levelDistributed;
-            totalDistributed += levelDistributed;
-            
-            // Остаток (из-за округления) возвращаем в пул
-            if (levelShare > levelDistributed) {
-                liquidityPool += (levelShare - levelDistributed);
-            }
         }
-        
-        // Резерв 10%
-        uint256 reserveAmount = totalPool * 10 / 100;
-        usdtToken.transfer(reserveWallet, reserveAmount);
-        
-        // Остаток (если есть) возвращается в пул
-        if (totalDistributed + reserveAmount < totalPool) {
-            liquidityPool += (totalPool - totalDistributed - reserveAmount);
+
+        distributedPerLevel[level] = levelDistributed;
+        totalDistributed += levelDistributed;
+
+        // Возвращаем только rounding (необработанные VIP уже учтены в amountPerUser)
+        if (levelShare > levelDistributed) {
+            returnedToPool += (levelShare - levelDistributed);
         }
-        
-        lastPoolDistribution = block.timestamp;
-        
-        emit PoolDistributed(totalPool, distributedPerLevel, reserveAmount);
     }
+
+    // Резерв 10%
+    uint256 reserveAmount = totalPool * 10 / 100;
+    usdtToken.safeTransfer(reserveWallet, reserveAmount);
+
+    // Возвращаем ВСЁ, что не было распределено (один раз)
+    liquidityPool += returnedToPool;
+
+    // Глобальный rounding (на всякий случай, обычно 0)
+    uint256 globalRemainder = totalPool - totalDistributed - reserveAmount - returnedToPool;
+    if (globalRemainder > 0) {
+        liquidityPool += globalRemainder;
+    }
+
+    lastPoolDistribution = block.timestamp;
+
+    emit PoolDistributed(totalPool, distributedPerLevel, reserveAmount);
+}
     
     // ========== KEEPER ФУНКЦИИ ==========
     
@@ -822,7 +830,7 @@ contract VirusMLM is ReentrancyGuard, Ownable {
      * @notice Проверка необходимости обслуживания
      */
     function checkUpkeep(bytes calldata) external view returns (bool upkeepNeeded, bytes memory performData) {
-        if (matrixClaimQueue.length > 0) {
+        if (matrixClaimQueue.length() > 0) {
             upkeepNeeded = true;
             performData = abi.encode("matrix");
             return (upkeepNeeded, performData);
@@ -834,7 +842,7 @@ contract VirusMLM is ReentrancyGuard, Ownable {
             return (upkeepNeeded, performData);
         }
         
-        if (poolClaimQueue.length > 0) {
+        if (poolClaimQueue.length() > 0) {
             upkeepNeeded = true;
             performData = abi.encode("claim_pool");
             return (upkeepNeeded, performData);
@@ -846,7 +854,7 @@ contract VirusMLM is ReentrancyGuard, Ownable {
     /**
      * @notice Выполнение обслуживания
      */
-    function performUpkeep(bytes calldata performData) external {
+    function performUpkeep(bytes calldata performData) external nonReentrant {
         string memory action = abi.decode(performData, (string));
         
         if (keccak256(abi.encodePacked(action)) == keccak256(abi.encodePacked("matrix"))) {
@@ -862,41 +870,38 @@ contract VirusMLM is ReentrancyGuard, Ownable {
      * @notice Обработка очереди матричных выплат
      */
     function _processMatrixClaims() internal {
-        uint256 processed = 0;
-        uint256 gasLimit = 5000000;
-        
-        for (uint256 i = 0; i < matrixClaimQueue.length && processed < 50 && gasleft() > gasLimit; i++) {
-            address userAddr = matrixClaimQueue[i];
-            if (userAddr != address(0) && users[userAddr].matrixBalance >= MIN_WITHDRAW) {
-                _forceClaimMatrix(userAddr);
-                processed++;
-            }
+    uint256 processed = 0;
+    uint256 gasLimit = 5000000;
+    
+    while (matrixClaimQueue.length() > 0 && processed < 50 && gasleft() > gasLimit) {
+        address userAddr = matrixClaimQueue.at(0);
+        if (users[userAddr].matrixBalance >= MIN_WITHDRAW) {
+            _forceClaimMatrix(userAddr);
+            processed++;
         }
-        
-        if (processed > 0) {
-            _cleanMatrixClaimQueue(processed);
-        }
+        // ВСЕГДА удаляем текущий элемент после обработки
+        matrixClaimQueue.remove(userAddr);
     }
+}
     
     /**
      * @notice Обработка очереди выплат из пула
      */
     function _processPoolClaims() internal {
-        uint256 processed = 0;
-        uint256 gasLimit = 5000000;
-        
-        for (uint256 i = 0; i < poolClaimQueue.length && processed < 50 && gasleft() > gasLimit; i++) {
-            address userAddr = poolClaimQueue[i];
-            if (userAddr != address(0) && users[userAddr].poolBalance >= MIN_WITHDRAW) {
-                _forceClaimPool(userAddr);
-                processed++;
-            }
+    uint256 processed = 0;
+    uint256 gasLimit = 5000000;
+    
+    while (poolClaimQueue.length() > 0 && processed < 50 && gasleft() > gasLimit) {
+        address userAddr = poolClaimQueue.at(0);
+        VipInfo memory vip = vipInfo[userAddr];
+        if (users[userAddr].poolBalance >= MIN_WITHDRAW && vip.isActive && block.timestamp < vip.expiresAt) {
+            _forceClaimPool(userAddr);
+            processed++;
         }
-        
-        if (processed > 0) {
-            _cleanPoolClaimQueue(processed);
-        }
+        // ВСЕГДА удаляем текущий элемент после обработки
+        poolClaimQueue.remove(userAddr);
     }
+}
     
     /**
      * @notice Принудительный вывод матричного баланса
@@ -914,7 +919,7 @@ contract VirusMLM is ReentrancyGuard, Ownable {
                 user.matrixBalance = 0;
                 user.totalEarned += toWallet;
                 
-                usdtToken.transfer(_user, toWallet);
+                usdtToken.safeTransfer(_user, toWallet);
                 _processReinvest(_user, toReinvest);
                 
                 emit MatrixClaimed(_user, toWallet, toReinvest);
@@ -938,7 +943,7 @@ contract VirusMLM is ReentrancyGuard, Ownable {
             user.totalEarned += toWallet;
             totalPoolPayouts += toWallet;
             
-            usdtToken.transfer(_user, toWallet);
+            usdtToken.safeTransfer(_user, toWallet);
             _processReinvest(_user, toReinvest);
             
             emit PoolClaimed(_user, toWallet, toReinvest);
@@ -948,64 +953,20 @@ contract VirusMLM is ReentrancyGuard, Ownable {
     // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ОЧЕРЕДЕЙ ==========
     
     function _addToMatrixClaimQueue(address _user) internal {
-        for (uint256 i = 0; i < matrixClaimQueue.length; i++) {
-            if (matrixClaimQueue[i] == _user) return;
-        }
-        matrixClaimQueue.push(_user);
-    }
-    
-    function _removeFromMatrixClaimQueue(address _user) internal {
-        for (uint256 i = 0; i < matrixClaimQueue.length; i++) {
-            if (matrixClaimQueue[i] == _user) {
-                matrixClaimQueue[i] = matrixClaimQueue[matrixClaimQueue.length - 1];
-                matrixClaimQueue.pop();
-                break;
-            }
-        }
-    }
-    
-    function _cleanMatrixClaimQueue(uint256 _processed) internal {
-        if (_processed >= matrixClaimQueue.length) {
-            delete matrixClaimQueue;
-        } else {
-            for (uint256 i = 0; i < matrixClaimQueue.length - _processed; i++) {
-                matrixClaimQueue[i] = matrixClaimQueue[i + _processed];
-            }
-            for (uint256 i = 0; i < _processed; i++) {
-                matrixClaimQueue.pop();
-            }
-        }
-    }
-    
-    function _addToPoolClaimQueue(address _user) internal {
-        for (uint256 i = 0; i < poolClaimQueue.length; i++) {
-            if (poolClaimQueue[i] == _user) return;
-        }
-        poolClaimQueue.push(_user);
-    }
-    
-    function _removeFromPoolClaimQueue(address _user) internal {
-        for (uint256 i = 0; i < poolClaimQueue.length; i++) {
-            if (poolClaimQueue[i] == _user) {
-                poolClaimQueue[i] = poolClaimQueue[poolClaimQueue.length - 1];
-                poolClaimQueue.pop();
-                break;
-            }
-        }
-    }
-    
-    function _cleanPoolClaimQueue(uint256 _processed) internal {
-        if (_processed >= poolClaimQueue.length) {
-            delete poolClaimQueue;
-        } else {
-            for (uint256 i = 0; i < poolClaimQueue.length - _processed; i++) {
-                poolClaimQueue[i] = poolClaimQueue[i + _processed];
-            }
-            for (uint256 i = 0; i < _processed; i++) {
-                poolClaimQueue.pop();
-            }
-        }
-    }
+    matrixClaimQueue.add(_user);
+}
+
+function _removeFromMatrixClaimQueue(address _user) internal {
+    matrixClaimQueue.remove(_user);
+}
+
+function _addToPoolClaimQueue(address _user) internal {
+    poolClaimQueue.add(_user);
+}
+
+function _removeFromPoolClaimQueue(address _user) internal {
+    poolClaimQueue.remove(_user);
+}
     
     function _safeTransfer(address _to, uint256 _amount) internal {
         bool success = usdtToken.transfer(_to, _amount);
@@ -1119,11 +1080,11 @@ contract VirusMLM is ReentrancyGuard, Ownable {
     }
     
     function getQueueInfo() external view returns (
-        uint256 matrixQueueLength,
-        uint256 poolQueueLength
-    ) {
-        return (matrixClaimQueue.length, poolClaimQueue.length);
-    }
+    uint256 matrixQueueLength,
+    uint256 poolQueueLength
+) {
+    return (matrixClaimQueue.length(), poolClaimQueue.length());
+}
     
     function getGovernanceInfo() external view returns (
         GovernancePhase phase,
@@ -1151,7 +1112,7 @@ contract VirusMLM is ReentrancyGuard, Ownable {
         address _gamePoolWallet,
         address _reserveWallet,
         address _developmentFundWallet
-    ) external onlyOwner {
+    ) external onlyOwnerOrMultisig {
         require(currentPhase == GovernancePhase.SINGLE_OWNER, "Only in phase 1");
         
         reinvestFeeWallet = _reinvestFeeWallet;
@@ -1211,4 +1172,4 @@ contract VirusMLM is ReentrancyGuard, Ownable {
     fallback() external {
         revert("Invalid function call");
     }
-}
+}  
