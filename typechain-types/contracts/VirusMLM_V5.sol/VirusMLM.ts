@@ -26,61 +26,63 @@ import type {
 export interface VirusMLMInterface extends Interface {
   getFunction(
     nameOrSignature:
+      | "BATCH_LIMIT"
+      | "BFS_QUEUE_SIZE"
+      | "DEFAULT_ADMIN_ROLE"
       | "MAX_REFERRAL_DEPTH"
       | "MAX_VIP_CLEANUP"
       | "MIN_WITHDRAW"
+      | "MULTISIG_ROLE"
+      | "OPERATOR_ROLE"
       | "PACKETS"
       | "POOL_DISTRIBUTION_INTERVAL"
       | "POOL_SHARES"
       | "VIP_DURATION"
       | "WITHDRAW_PERCENTAGES"
       | "activatePacket"
-      | "checkUpkeep"
+      | "batchClaimAll"
+      | "batchConfirmVip"
+      | "claimAll"
       | "claimMatrix"
       | "claimPool"
-      | "completeMultisigTransition"
       | "confirmVip"
-      | "currentPhase"
-      | "deploymentTime"
       | "developmentFundWallet"
       | "distributePool"
+      | "distributePoolBatch"
       | "donateToPool"
       | "emergencyClaimExpiredPool"
       | "emergencyWithdraw"
       | "gamePoolWallet"
-      | "getGovernanceInfo"
       | "getMatrixNode"
       | "getPoolInfo"
       | "getQueueInfo"
+      | "getRoleAdmin"
       | "getUserInfo"
       | "getVipInfo"
       | "getVipList"
-      | "inMatrixQueue"
-      | "inPoolQueue"
-      | "initiateMultisigTransition"
+      | "grantOperator"
+      | "grantRole"
+      | "hasRole"
       | "isRegistered"
       | "lastPoolDistribution"
       | "liquidityPool"
       | "matrixNodes"
-      | "multisigTransitionTime"
-      | "nextNodeId"
-      | "owner"
-      | "pendingMultisig"
-      | "performUpkeep"
       | "register"
       | "reinvestFeeWallet"
       | "renewVip"
-      | "renounceOwnership"
+      | "renounceRole"
       | "requestVip"
       | "reserveWallet"
+      | "revokeOperator"
+      | "revokeRole"
       | "revokeVip"
       | "rootId"
       | "setAntiSybilVerified"
+      | "supportsInterface"
       | "totalMatrixPayouts"
       | "totalPoolPayouts"
       | "totalReferralPayouts"
       | "totalUsers"
-      | "transferOwnership"
       | "updateWallets"
       | "usdtToken"
       | "users"
@@ -90,17 +92,19 @@ export interface VirusMLMInterface extends Interface {
   getEvent(
     nameOrSignatureOrTopic:
       | "AntiSybilVerified"
-      | "GovernancePhaseChanged"
+      | "BatchClaimed"
+      | "BatchVipConfirmed"
+      | "ClaimAll"
       | "MatrixClaimed"
       | "MatrixPayout"
-      | "MultisigTransitionCompleted"
-      | "MultisigTransitionStarted"
-      | "OwnershipTransferred"
       | "PacketActivated"
       | "PoolClaimed"
       | "PoolDistributed"
       | "PoolDonated"
       | "ReferralPayout"
+      | "RoleAdminChanged"
+      | "RoleGranted"
+      | "RoleRevoked"
       | "UserRegistered"
       | "VipConfirmed"
       | "VipRenewed"
@@ -108,6 +112,18 @@ export interface VirusMLMInterface extends Interface {
       | "VipRevoked"
   ): EventFragment;
 
+  encodeFunctionData(
+    functionFragment: "BATCH_LIMIT",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "BFS_QUEUE_SIZE",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "DEFAULT_ADMIN_ROLE",
+    values?: undefined
+  ): string;
   encodeFunctionData(
     functionFragment: "MAX_REFERRAL_DEPTH",
     values?: undefined
@@ -118,6 +134,14 @@ export interface VirusMLMInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "MIN_WITHDRAW",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "MULTISIG_ROLE",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "OPERATOR_ROLE",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -145,29 +169,22 @@ export interface VirusMLMInterface extends Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "checkUpkeep",
-    values: [BytesLike]
+    functionFragment: "batchClaimAll",
+    values: [AddressLike[]]
   ): string;
+  encodeFunctionData(
+    functionFragment: "batchConfirmVip",
+    values: [AddressLike[], BigNumberish]
+  ): string;
+  encodeFunctionData(functionFragment: "claimAll", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "claimMatrix",
     values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "claimPool", values?: undefined): string;
   encodeFunctionData(
-    functionFragment: "completeMultisigTransition",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
     functionFragment: "confirmVip",
     values: [AddressLike, BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "currentPhase",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "deploymentTime",
-    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "developmentFundWallet",
@@ -176,6 +193,10 @@ export interface VirusMLMInterface extends Interface {
   encodeFunctionData(
     functionFragment: "distributePool",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "distributePoolBatch",
+    values: [BigNumberish, BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "donateToPool",
@@ -194,10 +215,6 @@ export interface VirusMLMInterface extends Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "getGovernanceInfo",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
     functionFragment: "getMatrixNode",
     values: [BigNumberish]
   ): string;
@@ -208,6 +225,10 @@ export interface VirusMLMInterface extends Interface {
   encodeFunctionData(
     functionFragment: "getQueueInfo",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getRoleAdmin",
+    values: [BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "getUserInfo",
@@ -222,16 +243,16 @@ export interface VirusMLMInterface extends Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "inMatrixQueue",
+    functionFragment: "grantOperator",
     values: [AddressLike]
   ): string;
   encodeFunctionData(
-    functionFragment: "inPoolQueue",
-    values: [AddressLike]
+    functionFragment: "grantRole",
+    values: [BytesLike, AddressLike]
   ): string;
   encodeFunctionData(
-    functionFragment: "initiateMultisigTransition",
-    values: [AddressLike]
+    functionFragment: "hasRole",
+    values: [BytesLike, AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "isRegistered",
@@ -250,23 +271,6 @@ export interface VirusMLMInterface extends Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "multisigTransitionTime",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "nextNodeId",
-    values?: undefined
-  ): string;
-  encodeFunctionData(functionFragment: "owner", values?: undefined): string;
-  encodeFunctionData(
-    functionFragment: "pendingMultisig",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "performUpkeep",
-    values: [BytesLike]
-  ): string;
-  encodeFunctionData(
     functionFragment: "register",
     values: [AddressLike]
   ): string;
@@ -279,8 +283,8 @@ export interface VirusMLMInterface extends Interface {
     values: [AddressLike]
   ): string;
   encodeFunctionData(
-    functionFragment: "renounceOwnership",
-    values?: undefined
+    functionFragment: "renounceRole",
+    values: [BytesLike, AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "requestVip",
@@ -291,6 +295,14 @@ export interface VirusMLMInterface extends Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
+    functionFragment: "revokeOperator",
+    values: [AddressLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "revokeRole",
+    values: [BytesLike, AddressLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "revokeVip",
     values: [AddressLike]
   ): string;
@@ -298,6 +310,10 @@ export interface VirusMLMInterface extends Interface {
   encodeFunctionData(
     functionFragment: "setAntiSybilVerified",
     values: [AddressLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "supportsInterface",
+    values: [BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "totalMatrixPayouts",
@@ -316,10 +332,6 @@ export interface VirusMLMInterface extends Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "transferOwnership",
-    values: [AddressLike]
-  ): string;
-  encodeFunctionData(
     functionFragment: "updateWallets",
     values: [AddressLike, AddressLike, AddressLike, AddressLike]
   ): string;
@@ -331,6 +343,18 @@ export interface VirusMLMInterface extends Interface {
   ): string;
 
   decodeFunctionResult(
+    functionFragment: "BATCH_LIMIT",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "BFS_QUEUE_SIZE",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "DEFAULT_ADMIN_ROLE",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "MAX_REFERRAL_DEPTH",
     data: BytesLike
   ): Result;
@@ -340,6 +364,14 @@ export interface VirusMLMInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "MIN_WITHDRAW",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "MULTISIG_ROLE",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "OPERATOR_ROLE",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "PACKETS", data: BytesLike): Result;
@@ -364,33 +396,30 @@ export interface VirusMLMInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "checkUpkeep",
+    functionFragment: "batchClaimAll",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "batchConfirmVip",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "claimAll", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "claimMatrix",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "claimPool", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "completeMultisigTransition",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "confirmVip", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "currentPhase",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "deploymentTime",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(
     functionFragment: "developmentFundWallet",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
     functionFragment: "distributePool",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "distributePoolBatch",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -410,10 +439,6 @@ export interface VirusMLMInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "getGovernanceInfo",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "getMatrixNode",
     data: BytesLike
   ): Result;
@@ -426,23 +451,21 @@ export interface VirusMLMInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "getRoleAdmin",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "getUserInfo",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "getVipInfo", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "getVipList", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "inMatrixQueue",
+    functionFragment: "grantOperator",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(
-    functionFragment: "inPoolQueue",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "initiateMultisigTransition",
-    data: BytesLike
-  ): Result;
+  decodeFunctionResult(functionFragment: "grantRole", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "hasRole", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "isRegistered",
     data: BytesLike
@@ -459,20 +482,6 @@ export interface VirusMLMInterface extends Interface {
     functionFragment: "matrixNodes",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(
-    functionFragment: "multisigTransitionTime",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(functionFragment: "nextNodeId", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "pendingMultisig",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "performUpkeep",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "register", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "reinvestFeeWallet",
@@ -480,7 +489,7 @@ export interface VirusMLMInterface extends Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "renewVip", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "renounceOwnership",
+    functionFragment: "renounceRole",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "requestVip", data: BytesLike): Result;
@@ -488,10 +497,19 @@ export interface VirusMLMInterface extends Interface {
     functionFragment: "reserveWallet",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "revokeOperator",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "revokeRole", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "revokeVip", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "rootId", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "setAntiSybilVerified",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "supportsInterface",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -507,10 +525,6 @@ export interface VirusMLMInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "totalUsers", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "transferOwnership",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(
     functionFragment: "updateWallets",
     data: BytesLike
@@ -532,12 +546,64 @@ export namespace AntiSybilVerifiedEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
-export namespace GovernancePhaseChangedEvent {
-  export type InputTuple = [oldPhase: BigNumberish, newPhase: BigNumberish];
-  export type OutputTuple = [oldPhase: bigint, newPhase: bigint];
+export namespace BatchClaimedEvent {
+  export type InputTuple = [
+    users: AddressLike[],
+    matrixCount: BigNumberish,
+    poolCount: BigNumberish,
+    totalUsers: BigNumberish
+  ];
+  export type OutputTuple = [
+    users: string[],
+    matrixCount: bigint,
+    poolCount: bigint,
+    totalUsers: bigint
+  ];
   export interface OutputObject {
-    oldPhase: bigint;
-    newPhase: bigint;
+    users: string[];
+    matrixCount: bigint;
+    poolCount: bigint;
+    totalUsers: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace BatchVipConfirmedEvent {
+  export type InputTuple = [
+    users: AddressLike[],
+    starLevel: BigNumberish,
+    count: BigNumberish
+  ];
+  export type OutputTuple = [users: string[], starLevel: bigint, count: bigint];
+  export interface OutputObject {
+    users: string[];
+    starLevel: bigint;
+    count: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace ClaimAllEvent {
+  export type InputTuple = [
+    user: AddressLike,
+    matrixToWallet: BigNumberish,
+    poolToWallet: BigNumberish
+  ];
+  export type OutputTuple = [
+    user: string,
+    matrixToWallet: bigint,
+    poolToWallet: bigint
+  ];
+  export interface OutputObject {
+    user: string;
+    matrixToWallet: bigint;
+    poolToWallet: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -580,59 +646,12 @@ export namespace MatrixPayoutEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
-export namespace MultisigTransitionCompletedEvent {
-  export type InputTuple = [multisigAddress: AddressLike, time: BigNumberish];
-  export type OutputTuple = [multisigAddress: string, time: bigint];
-  export interface OutputObject {
-    multisigAddress: string;
-    time: bigint;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
-export namespace MultisigTransitionStartedEvent {
-  export type InputTuple = [
-    multisigAddress: AddressLike,
-    completionTime: BigNumberish
-  ];
-  export type OutputTuple = [multisigAddress: string, completionTime: bigint];
-  export interface OutputObject {
-    multisigAddress: string;
-    completionTime: bigint;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
-export namespace OwnershipTransferredEvent {
-  export type InputTuple = [previousOwner: AddressLike, newOwner: AddressLike];
-  export type OutputTuple = [previousOwner: string, newOwner: string];
-  export interface OutputObject {
-    previousOwner: string;
-    newOwner: string;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
 export namespace PacketActivatedEvent {
-  export type InputTuple = [
-    user: AddressLike,
-    packet: BigNumberish,
-    time: BigNumberish
-  ];
-  export type OutputTuple = [user: string, packet: bigint, time: bigint];
+  export type InputTuple = [user: AddressLike, packet: BigNumberish];
+  export type OutputTuple = [user: string, packet: bigint];
   export interface OutputObject {
     user: string;
     packet: bigint;
-    time: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -728,21 +747,70 @@ export namespace ReferralPayoutEvent {
   export type LogDescription = TypedLogDescription<Event>;
 }
 
-export namespace UserRegisteredEvent {
+export namespace RoleAdminChangedEvent {
   export type InputTuple = [
-    user: AddressLike,
-    referrer: AddressLike,
-    placementId: BigNumberish
+    role: BytesLike,
+    previousAdminRole: BytesLike,
+    newAdminRole: BytesLike
   ];
   export type OutputTuple = [
-    user: string,
-    referrer: string,
-    placementId: bigint
+    role: string,
+    previousAdminRole: string,
+    newAdminRole: string
   ];
+  export interface OutputObject {
+    role: string;
+    previousAdminRole: string;
+    newAdminRole: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace RoleGrantedEvent {
+  export type InputTuple = [
+    role: BytesLike,
+    account: AddressLike,
+    sender: AddressLike
+  ];
+  export type OutputTuple = [role: string, account: string, sender: string];
+  export interface OutputObject {
+    role: string;
+    account: string;
+    sender: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace RoleRevokedEvent {
+  export type InputTuple = [
+    role: BytesLike,
+    account: AddressLike,
+    sender: AddressLike
+  ];
+  export type OutputTuple = [role: string, account: string, sender: string];
+  export interface OutputObject {
+    role: string;
+    account: string;
+    sender: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace UserRegisteredEvent {
+  export type InputTuple = [user: AddressLike, referrer: AddressLike];
+  export type OutputTuple = [user: string, referrer: string];
   export interface OutputObject {
     user: string;
     referrer: string;
-    placementId: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -862,11 +930,21 @@ export interface VirusMLM extends BaseContract {
     event?: TCEvent
   ): Promise<this>;
 
+  BATCH_LIMIT: TypedContractMethod<[], [bigint], "view">;
+
+  BFS_QUEUE_SIZE: TypedContractMethod<[], [bigint], "view">;
+
+  DEFAULT_ADMIN_ROLE: TypedContractMethod<[], [string], "view">;
+
   MAX_REFERRAL_DEPTH: TypedContractMethod<[], [bigint], "view">;
 
   MAX_VIP_CLEANUP: TypedContractMethod<[], [bigint], "view">;
 
   MIN_WITHDRAW: TypedContractMethod<[], [bigint], "view">;
+
+  MULTISIG_ROLE: TypedContractMethod<[], [string], "view">;
+
+  OPERATOR_ROLE: TypedContractMethod<[], [string], "view">;
 
   PACKETS: TypedContractMethod<[arg0: BigNumberish], [bigint], "view">;
 
@@ -888,17 +966,23 @@ export interface VirusMLM extends BaseContract {
     "nonpayable"
   >;
 
-  checkUpkeep: TypedContractMethod<
-    [arg0: BytesLike],
-    [[boolean, string] & { upkeepNeeded: boolean; performData: string }],
-    "view"
+  batchClaimAll: TypedContractMethod<
+    [_users: AddressLike[]],
+    [void],
+    "nonpayable"
   >;
+
+  batchConfirmVip: TypedContractMethod<
+    [_users: AddressLike[], _starLevel: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+
+  claimAll: TypedContractMethod<[], [void], "nonpayable">;
 
   claimMatrix: TypedContractMethod<[], [void], "nonpayable">;
 
   claimPool: TypedContractMethod<[], [void], "nonpayable">;
-
-  completeMultisigTransition: TypedContractMethod<[], [void], "nonpayable">;
 
   confirmVip: TypedContractMethod<
     [_user: AddressLike, _starLevel: BigNumberish],
@@ -906,13 +990,15 @@ export interface VirusMLM extends BaseContract {
     "nonpayable"
   >;
 
-  currentPhase: TypedContractMethod<[], [bigint], "view">;
-
-  deploymentTime: TypedContractMethod<[], [bigint], "view">;
-
   developmentFundWallet: TypedContractMethod<[], [string], "view">;
 
   distributePool: TypedContractMethod<[], [void], "nonpayable">;
+
+  distributePoolBatch: TypedContractMethod<
+    [_level: BigNumberish, _startIndex: BigNumberish, _batchSize: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
 
   donateToPool: TypedContractMethod<
     [_amount: BigNumberish],
@@ -933,20 +1019,6 @@ export interface VirusMLM extends BaseContract {
   >;
 
   gamePoolWallet: TypedContractMethod<[], [string], "view">;
-
-  getGovernanceInfo: TypedContractMethod<
-    [],
-    [
-      [bigint, string, string, bigint, bigint] & {
-        phase: bigint;
-        currentOwner: string;
-        pendingMultisigAddress: string;
-        transitionCompletionTime: bigint;
-        daysSinceDeployment: bigint;
-      }
-    ],
-    "view"
-  >;
 
   getMatrixNode: TypedContractMethod<
     [_nodeId: BigNumberish],
@@ -988,6 +1060,8 @@ export interface VirusMLM extends BaseContract {
     "view"
   >;
 
+  getRoleAdmin: TypedContractMethod<[role: BytesLike], [string], "view">;
+
   getUserInfo: TypedContractMethod<
     [_user: AddressLike],
     [
@@ -1026,14 +1100,22 @@ export interface VirusMLM extends BaseContract {
     "view"
   >;
 
-  inMatrixQueue: TypedContractMethod<[arg0: AddressLike], [boolean], "view">;
-
-  inPoolQueue: TypedContractMethod<[arg0: AddressLike], [boolean], "view">;
-
-  initiateMultisigTransition: TypedContractMethod<
-    [_multisigAddress: AddressLike],
+  grantOperator: TypedContractMethod<
+    [account: AddressLike],
     [void],
     "nonpayable"
+  >;
+
+  grantRole: TypedContractMethod<
+    [role: BytesLike, account: AddressLike],
+    [void],
+    "nonpayable"
+  >;
+
+  hasRole: TypedContractMethod<
+    [role: BytesLike, account: AddressLike],
+    [boolean],
+    "view"
   >;
 
   isRegistered: TypedContractMethod<[arg0: AddressLike], [boolean], "view">;
@@ -1072,27 +1154,17 @@ export interface VirusMLM extends BaseContract {
     "view"
   >;
 
-  multisigTransitionTime: TypedContractMethod<[], [bigint], "view">;
-
-  nextNodeId: TypedContractMethod<[], [bigint], "view">;
-
-  owner: TypedContractMethod<[], [string], "view">;
-
-  pendingMultisig: TypedContractMethod<[], [string], "view">;
-
-  performUpkeep: TypedContractMethod<
-    [performData: BytesLike],
-    [void],
-    "nonpayable"
-  >;
-
   register: TypedContractMethod<[_referrer: AddressLike], [void], "nonpayable">;
 
   reinvestFeeWallet: TypedContractMethod<[], [string], "view">;
 
   renewVip: TypedContractMethod<[_user: AddressLike], [void], "nonpayable">;
 
-  renounceOwnership: TypedContractMethod<[], [void], "nonpayable">;
+  renounceRole: TypedContractMethod<
+    [role: BytesLike, callerConfirmation: AddressLike],
+    [void],
+    "nonpayable"
+  >;
 
   requestVip: TypedContractMethod<
     [_starLevel: BigNumberish],
@@ -1101,6 +1173,18 @@ export interface VirusMLM extends BaseContract {
   >;
 
   reserveWallet: TypedContractMethod<[], [string], "view">;
+
+  revokeOperator: TypedContractMethod<
+    [account: AddressLike],
+    [void],
+    "nonpayable"
+  >;
+
+  revokeRole: TypedContractMethod<
+    [role: BytesLike, account: AddressLike],
+    [void],
+    "nonpayable"
+  >;
 
   revokeVip: TypedContractMethod<[_user: AddressLike], [void], "nonpayable">;
 
@@ -1112,6 +1196,12 @@ export interface VirusMLM extends BaseContract {
     "nonpayable"
   >;
 
+  supportsInterface: TypedContractMethod<
+    [interfaceId: BytesLike],
+    [boolean],
+    "view"
+  >;
+
   totalMatrixPayouts: TypedContractMethod<[], [bigint], "view">;
 
   totalPoolPayouts: TypedContractMethod<[], [bigint], "view">;
@@ -1119,12 +1209,6 @@ export interface VirusMLM extends BaseContract {
   totalReferralPayouts: TypedContractMethod<[], [bigint], "view">;
 
   totalUsers: TypedContractMethod<[], [bigint], "view">;
-
-  transferOwnership: TypedContractMethod<
-    [newOwner: AddressLike],
-    [void],
-    "nonpayable"
-  >;
 
   updateWallets: TypedContractMethod<
     [
@@ -1174,6 +1258,15 @@ export interface VirusMLM extends BaseContract {
   ): T;
 
   getFunction(
+    nameOrSignature: "BATCH_LIMIT"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "BFS_QUEUE_SIZE"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "DEFAULT_ADMIN_ROLE"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
     nameOrSignature: "MAX_REFERRAL_DEPTH"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
@@ -1182,6 +1275,12 @@ export interface VirusMLM extends BaseContract {
   getFunction(
     nameOrSignature: "MIN_WITHDRAW"
   ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "MULTISIG_ROLE"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "OPERATOR_ROLE"
+  ): TypedContractMethod<[], [string], "view">;
   getFunction(
     nameOrSignature: "PACKETS"
   ): TypedContractMethod<[arg0: BigNumberish], [bigint], "view">;
@@ -1201,20 +1300,23 @@ export interface VirusMLM extends BaseContract {
     nameOrSignature: "activatePacket"
   ): TypedContractMethod<[_packetIndex: BigNumberish], [void], "nonpayable">;
   getFunction(
-    nameOrSignature: "checkUpkeep"
+    nameOrSignature: "batchClaimAll"
+  ): TypedContractMethod<[_users: AddressLike[]], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "batchConfirmVip"
   ): TypedContractMethod<
-    [arg0: BytesLike],
-    [[boolean, string] & { upkeepNeeded: boolean; performData: string }],
-    "view"
+    [_users: AddressLike[], _starLevel: BigNumberish],
+    [void],
+    "nonpayable"
   >;
+  getFunction(
+    nameOrSignature: "claimAll"
+  ): TypedContractMethod<[], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "claimMatrix"
   ): TypedContractMethod<[], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "claimPool"
-  ): TypedContractMethod<[], [void], "nonpayable">;
-  getFunction(
-    nameOrSignature: "completeMultisigTransition"
   ): TypedContractMethod<[], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "confirmVip"
@@ -1224,17 +1326,18 @@ export interface VirusMLM extends BaseContract {
     "nonpayable"
   >;
   getFunction(
-    nameOrSignature: "currentPhase"
-  ): TypedContractMethod<[], [bigint], "view">;
-  getFunction(
-    nameOrSignature: "deploymentTime"
-  ): TypedContractMethod<[], [bigint], "view">;
-  getFunction(
     nameOrSignature: "developmentFundWallet"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
     nameOrSignature: "distributePool"
   ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "distributePoolBatch"
+  ): TypedContractMethod<
+    [_level: BigNumberish, _startIndex: BigNumberish, _batchSize: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
   getFunction(
     nameOrSignature: "donateToPool"
   ): TypedContractMethod<[_amount: BigNumberish], [void], "nonpayable">;
@@ -1251,21 +1354,6 @@ export interface VirusMLM extends BaseContract {
   getFunction(
     nameOrSignature: "gamePoolWallet"
   ): TypedContractMethod<[], [string], "view">;
-  getFunction(
-    nameOrSignature: "getGovernanceInfo"
-  ): TypedContractMethod<
-    [],
-    [
-      [bigint, string, string, bigint, bigint] & {
-        phase: bigint;
-        currentOwner: string;
-        pendingMultisigAddress: string;
-        transitionCompletionTime: bigint;
-        daysSinceDeployment: bigint;
-      }
-    ],
-    "view"
-  >;
   getFunction(
     nameOrSignature: "getMatrixNode"
   ): TypedContractMethod<
@@ -1310,6 +1398,9 @@ export interface VirusMLM extends BaseContract {
     "view"
   >;
   getFunction(
+    nameOrSignature: "getRoleAdmin"
+  ): TypedContractMethod<[role: BytesLike], [string], "view">;
+  getFunction(
     nameOrSignature: "getUserInfo"
   ): TypedContractMethod<
     [_user: AddressLike],
@@ -1347,14 +1438,22 @@ export interface VirusMLM extends BaseContract {
     nameOrSignature: "getVipList"
   ): TypedContractMethod<[_starLevel: BigNumberish], [string[]], "view">;
   getFunction(
-    nameOrSignature: "inMatrixQueue"
-  ): TypedContractMethod<[arg0: AddressLike], [boolean], "view">;
+    nameOrSignature: "grantOperator"
+  ): TypedContractMethod<[account: AddressLike], [void], "nonpayable">;
   getFunction(
-    nameOrSignature: "inPoolQueue"
-  ): TypedContractMethod<[arg0: AddressLike], [boolean], "view">;
+    nameOrSignature: "grantRole"
+  ): TypedContractMethod<
+    [role: BytesLike, account: AddressLike],
+    [void],
+    "nonpayable"
+  >;
   getFunction(
-    nameOrSignature: "initiateMultisigTransition"
-  ): TypedContractMethod<[_multisigAddress: AddressLike], [void], "nonpayable">;
+    nameOrSignature: "hasRole"
+  ): TypedContractMethod<
+    [role: BytesLike, account: AddressLike],
+    [boolean],
+    "view"
+  >;
   getFunction(
     nameOrSignature: "isRegistered"
   ): TypedContractMethod<[arg0: AddressLike], [boolean], "view">;
@@ -1396,21 +1495,6 @@ export interface VirusMLM extends BaseContract {
     "view"
   >;
   getFunction(
-    nameOrSignature: "multisigTransitionTime"
-  ): TypedContractMethod<[], [bigint], "view">;
-  getFunction(
-    nameOrSignature: "nextNodeId"
-  ): TypedContractMethod<[], [bigint], "view">;
-  getFunction(
-    nameOrSignature: "owner"
-  ): TypedContractMethod<[], [string], "view">;
-  getFunction(
-    nameOrSignature: "pendingMultisig"
-  ): TypedContractMethod<[], [string], "view">;
-  getFunction(
-    nameOrSignature: "performUpkeep"
-  ): TypedContractMethod<[performData: BytesLike], [void], "nonpayable">;
-  getFunction(
     nameOrSignature: "register"
   ): TypedContractMethod<[_referrer: AddressLike], [void], "nonpayable">;
   getFunction(
@@ -1420,14 +1504,28 @@ export interface VirusMLM extends BaseContract {
     nameOrSignature: "renewVip"
   ): TypedContractMethod<[_user: AddressLike], [void], "nonpayable">;
   getFunction(
-    nameOrSignature: "renounceOwnership"
-  ): TypedContractMethod<[], [void], "nonpayable">;
+    nameOrSignature: "renounceRole"
+  ): TypedContractMethod<
+    [role: BytesLike, callerConfirmation: AddressLike],
+    [void],
+    "nonpayable"
+  >;
   getFunction(
     nameOrSignature: "requestVip"
   ): TypedContractMethod<[_starLevel: BigNumberish], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "reserveWallet"
   ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "revokeOperator"
+  ): TypedContractMethod<[account: AddressLike], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "revokeRole"
+  ): TypedContractMethod<
+    [role: BytesLike, account: AddressLike],
+    [void],
+    "nonpayable"
+  >;
   getFunction(
     nameOrSignature: "revokeVip"
   ): TypedContractMethod<[_user: AddressLike], [void], "nonpayable">;
@@ -1437,6 +1535,9 @@ export interface VirusMLM extends BaseContract {
   getFunction(
     nameOrSignature: "setAntiSybilVerified"
   ): TypedContractMethod<[_user: AddressLike], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "supportsInterface"
+  ): TypedContractMethod<[interfaceId: BytesLike], [boolean], "view">;
   getFunction(
     nameOrSignature: "totalMatrixPayouts"
   ): TypedContractMethod<[], [bigint], "view">;
@@ -1449,9 +1550,6 @@ export interface VirusMLM extends BaseContract {
   getFunction(
     nameOrSignature: "totalUsers"
   ): TypedContractMethod<[], [bigint], "view">;
-  getFunction(
-    nameOrSignature: "transferOwnership"
-  ): TypedContractMethod<[newOwner: AddressLike], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "updateWallets"
   ): TypedContractMethod<
@@ -1508,11 +1606,25 @@ export interface VirusMLM extends BaseContract {
     AntiSybilVerifiedEvent.OutputObject
   >;
   getEvent(
-    key: "GovernancePhaseChanged"
+    key: "BatchClaimed"
   ): TypedContractEvent<
-    GovernancePhaseChangedEvent.InputTuple,
-    GovernancePhaseChangedEvent.OutputTuple,
-    GovernancePhaseChangedEvent.OutputObject
+    BatchClaimedEvent.InputTuple,
+    BatchClaimedEvent.OutputTuple,
+    BatchClaimedEvent.OutputObject
+  >;
+  getEvent(
+    key: "BatchVipConfirmed"
+  ): TypedContractEvent<
+    BatchVipConfirmedEvent.InputTuple,
+    BatchVipConfirmedEvent.OutputTuple,
+    BatchVipConfirmedEvent.OutputObject
+  >;
+  getEvent(
+    key: "ClaimAll"
+  ): TypedContractEvent<
+    ClaimAllEvent.InputTuple,
+    ClaimAllEvent.OutputTuple,
+    ClaimAllEvent.OutputObject
   >;
   getEvent(
     key: "MatrixClaimed"
@@ -1527,27 +1639,6 @@ export interface VirusMLM extends BaseContract {
     MatrixPayoutEvent.InputTuple,
     MatrixPayoutEvent.OutputTuple,
     MatrixPayoutEvent.OutputObject
-  >;
-  getEvent(
-    key: "MultisigTransitionCompleted"
-  ): TypedContractEvent<
-    MultisigTransitionCompletedEvent.InputTuple,
-    MultisigTransitionCompletedEvent.OutputTuple,
-    MultisigTransitionCompletedEvent.OutputObject
-  >;
-  getEvent(
-    key: "MultisigTransitionStarted"
-  ): TypedContractEvent<
-    MultisigTransitionStartedEvent.InputTuple,
-    MultisigTransitionStartedEvent.OutputTuple,
-    MultisigTransitionStartedEvent.OutputObject
-  >;
-  getEvent(
-    key: "OwnershipTransferred"
-  ): TypedContractEvent<
-    OwnershipTransferredEvent.InputTuple,
-    OwnershipTransferredEvent.OutputTuple,
-    OwnershipTransferredEvent.OutputObject
   >;
   getEvent(
     key: "PacketActivated"
@@ -1583,6 +1674,27 @@ export interface VirusMLM extends BaseContract {
     ReferralPayoutEvent.InputTuple,
     ReferralPayoutEvent.OutputTuple,
     ReferralPayoutEvent.OutputObject
+  >;
+  getEvent(
+    key: "RoleAdminChanged"
+  ): TypedContractEvent<
+    RoleAdminChangedEvent.InputTuple,
+    RoleAdminChangedEvent.OutputTuple,
+    RoleAdminChangedEvent.OutputObject
+  >;
+  getEvent(
+    key: "RoleGranted"
+  ): TypedContractEvent<
+    RoleGrantedEvent.InputTuple,
+    RoleGrantedEvent.OutputTuple,
+    RoleGrantedEvent.OutputObject
+  >;
+  getEvent(
+    key: "RoleRevoked"
+  ): TypedContractEvent<
+    RoleRevokedEvent.InputTuple,
+    RoleRevokedEvent.OutputTuple,
+    RoleRevokedEvent.OutputObject
   >;
   getEvent(
     key: "UserRegistered"
@@ -1632,15 +1744,37 @@ export interface VirusMLM extends BaseContract {
       AntiSybilVerifiedEvent.OutputObject
     >;
 
-    "GovernancePhaseChanged(uint8,uint8)": TypedContractEvent<
-      GovernancePhaseChangedEvent.InputTuple,
-      GovernancePhaseChangedEvent.OutputTuple,
-      GovernancePhaseChangedEvent.OutputObject
+    "BatchClaimed(address[],uint256,uint256,uint256)": TypedContractEvent<
+      BatchClaimedEvent.InputTuple,
+      BatchClaimedEvent.OutputTuple,
+      BatchClaimedEvent.OutputObject
     >;
-    GovernancePhaseChanged: TypedContractEvent<
-      GovernancePhaseChangedEvent.InputTuple,
-      GovernancePhaseChangedEvent.OutputTuple,
-      GovernancePhaseChangedEvent.OutputObject
+    BatchClaimed: TypedContractEvent<
+      BatchClaimedEvent.InputTuple,
+      BatchClaimedEvent.OutputTuple,
+      BatchClaimedEvent.OutputObject
+    >;
+
+    "BatchVipConfirmed(address[],uint256,uint256)": TypedContractEvent<
+      BatchVipConfirmedEvent.InputTuple,
+      BatchVipConfirmedEvent.OutputTuple,
+      BatchVipConfirmedEvent.OutputObject
+    >;
+    BatchVipConfirmed: TypedContractEvent<
+      BatchVipConfirmedEvent.InputTuple,
+      BatchVipConfirmedEvent.OutputTuple,
+      BatchVipConfirmedEvent.OutputObject
+    >;
+
+    "ClaimAll(address,uint256,uint256)": TypedContractEvent<
+      ClaimAllEvent.InputTuple,
+      ClaimAllEvent.OutputTuple,
+      ClaimAllEvent.OutputObject
+    >;
+    ClaimAll: TypedContractEvent<
+      ClaimAllEvent.InputTuple,
+      ClaimAllEvent.OutputTuple,
+      ClaimAllEvent.OutputObject
     >;
 
     "MatrixClaimed(address,uint256,uint256)": TypedContractEvent<
@@ -1665,40 +1799,7 @@ export interface VirusMLM extends BaseContract {
       MatrixPayoutEvent.OutputObject
     >;
 
-    "MultisigTransitionCompleted(address,uint256)": TypedContractEvent<
-      MultisigTransitionCompletedEvent.InputTuple,
-      MultisigTransitionCompletedEvent.OutputTuple,
-      MultisigTransitionCompletedEvent.OutputObject
-    >;
-    MultisigTransitionCompleted: TypedContractEvent<
-      MultisigTransitionCompletedEvent.InputTuple,
-      MultisigTransitionCompletedEvent.OutputTuple,
-      MultisigTransitionCompletedEvent.OutputObject
-    >;
-
-    "MultisigTransitionStarted(address,uint256)": TypedContractEvent<
-      MultisigTransitionStartedEvent.InputTuple,
-      MultisigTransitionStartedEvent.OutputTuple,
-      MultisigTransitionStartedEvent.OutputObject
-    >;
-    MultisigTransitionStarted: TypedContractEvent<
-      MultisigTransitionStartedEvent.InputTuple,
-      MultisigTransitionStartedEvent.OutputTuple,
-      MultisigTransitionStartedEvent.OutputObject
-    >;
-
-    "OwnershipTransferred(address,address)": TypedContractEvent<
-      OwnershipTransferredEvent.InputTuple,
-      OwnershipTransferredEvent.OutputTuple,
-      OwnershipTransferredEvent.OutputObject
-    >;
-    OwnershipTransferred: TypedContractEvent<
-      OwnershipTransferredEvent.InputTuple,
-      OwnershipTransferredEvent.OutputTuple,
-      OwnershipTransferredEvent.OutputObject
-    >;
-
-    "PacketActivated(address,uint256,uint256)": TypedContractEvent<
+    "PacketActivated(address,uint256)": TypedContractEvent<
       PacketActivatedEvent.InputTuple,
       PacketActivatedEvent.OutputTuple,
       PacketActivatedEvent.OutputObject
@@ -1753,7 +1854,40 @@ export interface VirusMLM extends BaseContract {
       ReferralPayoutEvent.OutputObject
     >;
 
-    "UserRegistered(address,address,uint256)": TypedContractEvent<
+    "RoleAdminChanged(bytes32,bytes32,bytes32)": TypedContractEvent<
+      RoleAdminChangedEvent.InputTuple,
+      RoleAdminChangedEvent.OutputTuple,
+      RoleAdminChangedEvent.OutputObject
+    >;
+    RoleAdminChanged: TypedContractEvent<
+      RoleAdminChangedEvent.InputTuple,
+      RoleAdminChangedEvent.OutputTuple,
+      RoleAdminChangedEvent.OutputObject
+    >;
+
+    "RoleGranted(bytes32,address,address)": TypedContractEvent<
+      RoleGrantedEvent.InputTuple,
+      RoleGrantedEvent.OutputTuple,
+      RoleGrantedEvent.OutputObject
+    >;
+    RoleGranted: TypedContractEvent<
+      RoleGrantedEvent.InputTuple,
+      RoleGrantedEvent.OutputTuple,
+      RoleGrantedEvent.OutputObject
+    >;
+
+    "RoleRevoked(bytes32,address,address)": TypedContractEvent<
+      RoleRevokedEvent.InputTuple,
+      RoleRevokedEvent.OutputTuple,
+      RoleRevokedEvent.OutputObject
+    >;
+    RoleRevoked: TypedContractEvent<
+      RoleRevokedEvent.InputTuple,
+      RoleRevokedEvent.OutputTuple,
+      RoleRevokedEvent.OutputObject
+    >;
+
+    "UserRegistered(address,address)": TypedContractEvent<
       UserRegisteredEvent.InputTuple,
       UserRegisteredEvent.OutputTuple,
       UserRegisteredEvent.OutputObject
